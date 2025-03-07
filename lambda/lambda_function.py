@@ -2,31 +2,39 @@ import json
 import boto3
 import os
 
-# Initialize DynamoDB client
 dynamodb = boto3.resource('dynamodb')
-
-# Ensure the correct environment variable is being used
-table_name = os.environ.get("DYNAMODB_TABLE", "FoodOrders")
+table_name = os.environ.get("DYNAMODB_TABLE")  # Use .get() to avoid crashing on missing var
 table = dynamodb.Table(table_name)
 
 def lambda_handler(event, context):
     try:
-        # Parse the incoming event
-        body = json.loads(event['body'])  # Ensure event['body'] exists
+        print("Received event:", json.dumps(event, indent=2))  # Debug log
 
-        # Insert order into DynamoDB
-        table.put_item(Item={
-            'orderId': body['OrderID'],
-            'customerName': body['CustomerName'],
-            'totalPrice': str(body['TotalPrice']),  # Ensure it's stored as a string
-            'status': 'Pending'
+        # Parse request body safely
+        body = json.loads(event.get("body", "{}"))
+        
+        print("Parsed body:", body)  # Debug log
+
+        if "OrderID" not in body or "CustomerName" not in body or "TotalPrice" not in body:
+            raise ValueError("Missing required order fields")
+
+        # Insert into DynamoDB
+        response = table.put_item(Item={
+            "orderId": body["OrderID"],
+            "customerName": body["CustomerName"],
+            "totalPrice": str(body["TotalPrice"]),  # Convert to string for DynamoDB
+            "status": "Pending"
         })
+
+        print("DynamoDB Response:", response)  # Debug log
 
         return {
             "statusCode": 200,
             "body": json.dumps({"message": "Order placed successfully!"})
         }
+
     except Exception as e:
+        print("Error:", str(e))  # Debug log
         return {
             "statusCode": 500,
             "body": json.dumps({"error": str(e)})
