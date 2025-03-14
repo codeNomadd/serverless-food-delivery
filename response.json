@@ -1,1 +1,1 @@
-{"statusCode": 200, "body": "{\"message\": \"Order placed successfully!\"}"}
+{"statusCode": 200, "body": "{\"customerName\": \"Bob\", \"totalPrice\": \"15.5\", \"orderId\": \"11111\", \"status\": \"Pending\"}"}
