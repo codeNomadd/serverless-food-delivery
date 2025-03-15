@@ -17,7 +17,11 @@ def lambda_handler(event, context):
     try:
         print("Received event:", json.dumps(event, indent=2))
 
-        http_method = event["httpMethod"]
+        # ✅ Extract HTTP method for both REST and HTTP APIs
+        http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
+
+        if not http_method:
+            return {"statusCode": 400, "body": json.dumps({"error": "Missing httpMethod"})}
 
         if http_method == "POST":
             return create_order(event)
@@ -34,7 +38,7 @@ def lambda_handler(event, context):
         print("Error:", str(e))
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
-# ✅ 1. CREATE ORDER (POST)
+# ✅ CREATE ORDER (POST)
 def create_order(event):
     """
     Stores a new order in DynamoDB.
@@ -50,7 +54,7 @@ def create_order(event):
     order = {
         "orderId": order_id,
         "customerName": body["CustomerName"],
-        "items": body["Items"],  # Expecting a list of food items
+        "items": body["Items"],
         "totalPrice": str(body["TotalPrice"]),
         "status": "Pending",
         "createdAt": timestamp
@@ -63,30 +67,29 @@ def create_order(event):
         "body": json.dumps({"message": "Order placed successfully!", "orderId": order_id})
     }
 
-# ✅ 2. FETCH ORDER (GET)
+# ✅ FETCH ORDER (GET)
 def get_order(event):
     """
     Retrieves an order by orderId.
     """
-    order_id = event.get("queryStringParameters", {}).get("orderId")
+    query_params = event.get("queryStringParameters", {})
 
-    if not order_id:
+    if not query_params or "orderId" not in query_params:
         return {"statusCode": 400, "body": json.dumps({"error": "Missing orderId"})}
+
+    order_id = query_params["orderId"]
 
     response = table.get_item(Key={"orderId": order_id})
 
     if "Item" not in response:
         return {"statusCode": 404, "body": json.dumps({"error": "Order not found"})}
 
-    # Ensure proper JSON response
     return {
         "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(response["Item"], indent=2)  # Pretty-print JSON
+        "body": json.dumps(response["Item"])
     }
 
-
-# ✅ 3. UPDATE ORDER STATUS (PUT)
+# ✅ UPDATE ORDER STATUS (PUT)
 def update_order(event):
     """
     Updates order status (e.g., Pending → Delivered).
@@ -112,7 +115,7 @@ def update_order(event):
         "body": json.dumps({"message": "Order updated successfully!", "updatedFields": response["Attributes"]})
     }
 
-# ✅ 4. DELETE ORDER (DELETE)
+# ✅ DELETE ORDER (DELETE)
 def delete_order(event):
     """
     Cancels an order.
